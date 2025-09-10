@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Metal Inspection Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0056b3;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 20px auto;
+            border: 1px solid #ddd;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        #videoFeed {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .controls button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+        .results-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .result-card {
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            min-width: 300px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .result-card h2 {
+            color: #007bff;
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .defect-item {
+            background-color: #ffe0b2; /* Light orange */
+            border-left: 4px solid #ff9800; /* Orange */
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        .defect-item p {
+            margin: 0;
+            font-size: 0.9em;
+        }
+        .measurement-item p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .status-message {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-time Metal Inspection Demo</h1>
+
+        <div class="controls">
+            <button id="startStream">Start Inspection</button>
+            <button id="stopStream" disabled>Stop Inspection</button>
+        </div>
+
+        <div class="video-container">
+            <video id="videoFeed" autoplay muted></video>
+            <canvas id="overlayCanvas"></canvas>
+        </div>
+
+        <div class="results-container">
+            <div class="result-card">
+                <h2>Defect Detection</h2>
+                <div id="defectResults">
+                    <p>No defects detected yet.</p>
+                </div>
+            </div>
+            <div class="result-card">
+                <h2>Measurement</h2>
+                <div id="measurementResults">
+                    <p>No measurements yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <p class="status-message" id="statusMessage">Ready to start inspection.</p>
+    </div>
+
+    <script>
+        const videoFeed = document.getElementById("videoFeed");
+        const overlayCanvas = document.getElementById("overlayCanvas");
+        const ctx = overlayCanvas.getContext("2d");
+        const startStreamBtn = document.getElementById("startStream");
+        const stopStreamBtn = document.getElementById("stopStream");
+        const defectResultsDiv = document.getElementById("defectResults");
+        const measurementResultsDiv = document.getElementById("measurementResults");
+        const statusMessage = document.getElementById("statusMessage");
+
+        let streamInterval;
+        let videoStream;
+
+        const API_URL = "http://localhost:5000/api/inspect/base64";
+
+        // Function to get a simulated video frame (replace with actual camera feed)
+        async function getSimulatedFrame() {
+            // For demonstration, we'll create a simple canvas image
+            const canvas = document.createElement("canvas");
+            canvas.width = 640;
+            canvas.height = 480;
+            const ctx = canvas.getContext("2d");
+
+            // Draw a background
+            ctx.fillStyle = "#ccc";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Simulate a metal part with some texture
+            ctx.fillStyle = "#888";
+            ctx.fillRect(50, 50, 540, 380);
+            for (let i = 0; i < 10; i++) {
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.2})`;
+                ctx.fillRect(50 + Math.random() * 500, 50 + Math.random() * 350, 20, 20);
+            }
+
+            // Simulate a defect (e.g., a scratch)
+            if (Math.random() < 0.5) { // Randomly add a defect
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(100 + Math.random() * 400, 100 + Math.random() * 200);
+                ctx.lineTo(150 + Math.random() * 400, 150 + Math.random() * 200);
+                ctx.stroke();
+                ctx.font = "20px Arial";
+                ctx.fillStyle = "red";
+                ctx.fillText("Defect!", 100 + Math.random() * 400, 90 + Math.random() * 200);
+            }
+
+            return new Promise(resolve => {
+                canvas.toBlob(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result.split(",")[1]);
+                    reader.readAsDataURL(blob);
+                }, "image/jpeg");
+            });
+        }
+
+        async function sendFrameForInspection() {
+            statusMessage.textContent = "Sending frame for inspection...";
+            const imageData = await getSimulatedFrame(); // Get base64 image data
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        image_data: imageData,
+                        // Add measurement points if needed for the demo
+                        measurement_points: [[100, 100], [500, 100]],
+                        scale_factor: 0.01
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    statusMessage.textContent = "Inspection complete.";
+                    displayResults(result.results);
+                    drawOverlay(result.results);
+                } else {
+                    statusMessage.textContent = `Inspection failed: ${result.error}`;
+                    console.error("Inspection failed:", result.error);
+                }
+            } catch (error) {
+                statusMessage.textContent = `Error during inspection: ${error.message}`;
+                console.error("Error during inspection:", error);
+            }
+        }
+
+        function displayResults(results) {
+            // Display defects
+            defectResultsDiv.innerHTML = "";
+            if (results.defects && results.defects.length > 0) {
+                results.defects.forEach(defect => {
+                    const defectItem = document.createElement("div");
+                    defectItem.className = "defect-item";
+                    defectItem.innerHTML = `
+                        <p><strong>Type:</strong> ${defect.type}</p>
+                        <p><strong>Confidence:</strong> ${(defect.confidence * 100).toFixed(2)}%</p>
+                        <p><strong>Location:</strong> ${defect.location || 'N/A'}</p>
+                    `;
+                    defectResultsDiv.appendChild(defectItem);
+                });
+            } else {
+                defectResultsDiv.innerHTML = "<p>No defects detected.</p>";
+            }
+
+            // Display measurements
+            measurementResultsDiv.innerHTML = "";
+            if (results.measurements) {
+                const measurements = results.measurements;
+                measurementResultsDiv.innerHTML = `
+                    <div class="measurement-item"><p><strong>Measured Length:</strong> ${measurements.measured_length ? measurements.measured_length.toFixed(2) + ' mm' : 'N/A'}</p></div>
+                    <div class="measurement-item"><p><strong>Deviation:</strong> ${measurements.deviation ? measurements.deviation.toFixed(2) + ' mm' : 'N/A'}</p></div>
+                `;
+            } else {
+                measurementResultsDiv.innerHTML = "<p>No measurements available.</p>";
+            }
+        }
+
+        function drawOverlay(results) {
+            // Clear previous drawings
+            ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            // Draw bounding boxes for defects
+            if (results.defects && results.defects.length > 0) {
+                results.defects.forEach(defect => {
+                    if (defect.box) {
+                        const [x1, y1, x2, y2] = defect.box;
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+
+                        ctx.strokeStyle = "#FF0000"; // Red for defects
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x1, y1, width, height);
+
+                        ctx.fillStyle = "#FF0000";
+                        ctx.font = "16px Arial";
+                        ctx.fillText(`${defect.type} (${(defect.confidence * 100).toFixed(1)}%)`, x1, y1 > 10 ? y1 - 5 : 10);
+                    }
+                });
+            }
+        }
+
+        startStreamBtn.addEventListener("click", () => {
+            startStreamBtn.disabled = true;
+            stopStreamBtn.disabled = false;
+            statusMessage.textContent = "Starting inspection stream...";
+
+            // Simulate video stream (replace with actual getUserMedia for real camera)
+            videoFeed.srcObject = null; // Clear any previous stream
+            videoFeed.src = ""; // Clear any previous source
+            videoFeed.load();
+
+            // Set canvas dimensions to match video (simulated)
+            overlayCanvas.width = 640;
+            overlayCanvas.height = 480;
+
+            // Start sending frames every 2 seconds
+            streamInterval = setInterval(sendFrameForInspection, 2000);
+            statusMessage.textContent = "Inspection stream started.";
+        });
+
+        stopStreamBtn.addEventListener("click", () => {
+            clearInterval(streamInterval);
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+            videoFeed.srcObject = null;
+            startStreamBtn.disabled = false;
+            stopStreamBtn.disabled = true;
+            statusMessage.textContent = "Inspection stream stopped.";
+        });
+
+        // Initial setup for canvas size based on video feed (if real camera was used)
+        videoFeed.addEventListener("loadedmetadata", () => {
+            overlayCanvas.width = videoFeed.videoWidth;
+            overlayCanvas.height = videoFeed.videoHeight;
+        });
+    </script>
+</body>
+</html>
+
+
