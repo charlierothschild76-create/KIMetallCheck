@@ -78,7 +78,7 @@ def mode_produktion(camera_source=None):
     logger.info("Ausschleuser: %s (Dauer: %d ms)", config.REJECTION_MODE, config.REJECTION_DURATION_MS)
     logger.info("Schwellwert:  %d | Min. Fläche: %d px²", config.DIFF_THRESHOLD, config.MIN_CHIP_AREA)
 
-    camera = CameraSource(camera_source or config.CAMERA_SOURCE)
+    camera = CameraSource(config.CAMERA_SOURCE if camera_source is None else camera_source)
     detector = ChipDetector(
         diff_threshold=config.DIFF_THRESHOLD,
         min_chip_area=config.MIN_CHIP_AREA,
