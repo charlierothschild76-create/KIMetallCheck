@@ -8,7 +8,7 @@ import os
 # Handy (Android "IP Webcam" App): "http://192.168.x.x:8080/video"
 # USB-Webcam:                       0  (oder 1, 2, ...)
 # Videodatei zum Testen:            "test.mp4"
-CAMERA_SOURCE = os.getenv("CAMERA_SOURCE", "http://192.168.1.100:8080/video")
+CAMERA_SOURCE = os.getenv("CAMERA_SOURCE", "http://192.168.178.119:8080/video")
 
 # ---------------------------------------------------------------------------
 # Spänerkennung
