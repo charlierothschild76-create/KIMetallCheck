@@ -1,7 +1,15 @@
-opencv-python
-numpy
-ultralytics
-flask
-flask-cors
+# KIMetallCheck - Abhängigkeiten
+# Installation: pip install -r requirements.txt
 
+# Bildverarbeitung (Spanerkennung)
+opencv-python>=4.8.0
+numpy>=1.24.0
 
+# Web-Monitor
+flask>=3.0.0
+
+# Optional: Raspberry Pi GPIO (nur auf RPi installieren)
+# RPi.GPIO>=0.7.1
+
+# Optional: USB-Relay Steuerung (für Pneumatikzylinder über seriellen Port)
+# pyserial>=3.5
