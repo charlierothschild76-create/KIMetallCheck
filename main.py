@@ -17,8 +17,8 @@ import config
 from core.chip_detector import ChipDetector
 from core.reference_manager import ReferenceManager
 from core.conveyor_loop import ConveyorLoop
-from io.camera_source import CameraSource
-from io.rejection_controller import RejectionController
+from hardware.camera_source import CameraSource
+from hardware.rejection_controller import RejectionController
 import ui.server as web_server
 
 # ---------------------------------------------------------------------------
